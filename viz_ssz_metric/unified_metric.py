@@ -138,9 +138,12 @@ class UnifiedSSZMetric:
         else:
             self.scalar_theory = None
         
-        # Scalar field state (will be integrated later with TOV)
-        self.phi = 0.0        # Scalar field value
-        self.phi_prime = 0.0  # Radial derivative
+        # Scalar field state
+        # NOTE: Quick approximation until full TOV integration
+        # φ(r) ≈ φ_0 × exp(-r/r_φ) gives non-trivial T_μν
+        self.phi_0 = 0.1  # Initial field amplitude
+        self.phi = 0.0        # Will be set dynamically in compute_all
+        self.phi_prime = 0.0  # Will be set dynamically in compute_all
         self._cache = {}  # Performance cache
         
         # Berechne fundamentale Größen
@@ -757,6 +760,35 @@ class UnifiedSSZMetric:
         # Saturiere bei 1
         return min(Xi_total, 1.0)
     
+    # ======================== SCALAR FIELD APPROXIMATION ========================
+    
+    def approximate_phi(self, r: float) -> float:
+        """
+        Quick approximation: φ(r) = φ_0 × exp(-r/r_φ)
+        
+        Not perfect but NON-ZERO!
+        This gives non-trivial T_μν until full TOV integration.
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            Approximate φ(r)
+        """
+        return self.phi_0 * np.exp(-r / self.r_phi)
+    
+    def approximate_phi_prime(self, r: float) -> float:
+        """
+        Derivative: d/dr φ(r) = -φ_0/r_φ × exp(-r/r_φ)
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            Approximate φ'(r)
+        """
+        return -self.phi_0 / self.r_phi * np.exp(-r / self.r_phi)
+    
     # ======================== MASTER COMPUTE ========================
     
     def compute_all(self, r: float, theta: float = np.pi/2) -> Dict:
@@ -774,6 +806,9 @@ class UnifiedSSZMetric:
             - Kosmologie
             - UND MEHR!
         """
+        # CRITICAL: Set φ(r) dynamically!
+        self.phi = self.approximate_phi(r)
+        self.phi_prime = self.approximate_phi_prime(r)
         result = {
             # Fundamentale Skalen
             'r': r,
@@ -782,6 +817,10 @@ class UnifiedSSZMetric:
             'r_phi': self.r_phi,
             'rho_max': self.rho_max,
             'K_max': self.K_max,
+            
+            # Scalar Field (NOW NON-ZERO!)
+            'phi': self.phi,
+            'phi_prime': self.phi_prime,
             
             # Segment-Dichte
             'Xi': self.segment_density(r),

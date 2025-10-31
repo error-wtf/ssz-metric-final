@@ -254,43 +254,68 @@ print(f"Orbit at 10 r_s: {'STABLE' if stable else 'UNSTABLE'}")
 
 ```
 ssz-full-metric/
-├── viz_ssz_metric/
-│   ├── unified_metric.py          # Main implementation
-│   └── geodesics_minimal.py       # Geodesic solver
-├── tests/
-│   ├── test_photon_sphere.py      # Photon sphere tests
-│   ├── test_shadow_radius.py      # Shadow tests
-│   ├── test_geodesics_minimal.py  # Geodesic tests
-│   ├── test_qnm.py                # QNM tests
-│   ├── test_perihelion.py         # Perihelion tests
-│   ├── test_isco.py               # ISCO tests
-│   ├── test_observables_complete.py  # Integration tests
-│   └── test_complete_metric.py    # Final validation
-├── USAGE_EXAMPLE_COMPLETE.py      # Complete usage demo
-├── PERFECT_METRIC_ACHIEVED.md     # Achievement doc
-└── README.md                      # This file
+├── viz_ssz_metric/              # Main package
+│   ├── unified_metric.py        # UnifiedSSZMetric implementation
+│   ├── geodesics_minimal.py     # Geodesic solver
+│   └── ...                      # Additional modules
+├── tests/                       # Test suite
+│   ├── test_complete_metric.py  # Core validation (5 tests)
+│   ├── test_photon_sphere.py    # Photon sphere (5 tests)
+│   ├── test_perihelion.py       # Mercury precession (5 tests)
+│   ├── test_qnm.py              # QNM frequencies (5 tests)
+│   ├── test_isco.py             # ISCO calculation (4 tests)
+│   └── README_TESTS.md          # Test documentation
+├── notebooks/                   # Tutorials
+│   ├── 01_Quick_Start.md        # Beginner tutorial
+│   ├── 02_Mercury_Validation.md # Validation guide
+│   └── README.md                # Tutorial index
+├── .github/workflows/           # CI/CD
+│   ├── tests.yml                # Multi-platform testing
+│   └── validation.yml           # Scientific validation
+├── CHANGELOG.md                 # Version history
+├── CONTRIBUTING.md              # Contribution guide
+├── pyproject.toml               # Package configuration
+└── README.md                    # This file
 ```
 
 ---
 
 ## 🔧 Installation
 
+### From PyPI (when available)
+
 ```bash
-# Clone repository
-git clone <repo-url>
-cd ssz-full-metric
-
-# Install dependencies
-pip install numpy scipy
-
-# Run tests
-python tests/test_complete_metric.py
+pip install ssz-metric
 ```
 
-**Requirements:**
-- Python 3.7+
-- NumPy
-- SciPy
+### From Source
+
+```bash
+# Clone repository
+git clone https://github.com/USERNAME/ssz-full-metric
+cd ssz-full-metric
+
+# Install in development mode
+pip install -e .
+
+# Or install with all extras
+pip install -e ".[all]"
+```
+
+### Requirements
+
+- Python 3.7 - 3.12
+- numpy >= 1.20
+- scipy >= 1.7
+
+### Verify Installation
+
+```bash
+python -c "from viz_ssz_metric import UnifiedSSZMetric; print('✓ Install OK')"
+
+# Run core tests
+python -m pytest tests/test_complete_metric.py -v
+```
 
 ---
 
@@ -298,12 +323,13 @@ python tests/test_complete_metric.py
 
 ```bibtex
 @software{ssz_metric_2025,
-  title = {Perfect SSZ Metric Implementation},
+  title = {SSZ Metric: Segmented Spacetime Implementation},
   author = {Wrede, Carmen and Casu, Lino},
   year = {2025},
   month = {October},
   version = {1.0.0},
-  note = {Complete observable suite: 21 methods, 41 tests}
+  url = {https://github.com/USERNAME/ssz-full-metric},
+  note = {26 observable methods, 99.67\% Mercury perihelion agreement}
 }
 ```
 
@@ -321,20 +347,32 @@ python tests/test_complete_metric.py
 
 ## 📚 Documentation
 
-- `PERFECT_METRIC_ACHIEVED.md` - Complete feature list
-- `SESSION_SUMMARY_PROMPT_5_FINAL.md` - Development summary
-- `USAGE_EXAMPLE_COMPLETE.py` - Full usage examples
-- `PROGRESS_FAHRPLAN_*.md` - Development roadmaps
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and features
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Deployment instructions
+- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Current project status
+- **[COVERAGE.md](COVERAGE.md)** - Test coverage documentation
+- **[SCIENTIFIC_HONESTY.md](SCIENTIFIC_HONESTY.md)** - Scientific approach
+- **[SSZ_VS_GR_ANALYSIS.md](SSZ_VS_GR_ANALYSIS.md)** - SSZ-GR comparison
+- **[notebooks/](notebooks/)** - Interactive tutorials
 
 ---
 
 ## 🤝 Contributing
 
-This implementation is scientifically complete (100/100). Contributions welcome for:
-- Additional test cases
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
+- **Bug reports** - Use issue templates
+- **Feature requests** - Scientific justification required
+- **Code contributions** - Follow PEP 8, include tests
+- **Documentation** - Tutorials, examples, explanations
+
+**Areas for contribution:**
+- Additional test cases & edge cases
 - Performance optimizations
-- Extended documentation
-- New observables (Kerr metric, etc.)
+- More tutorial notebooks
+- Extended Kerr features
+- New observables
 
 ---
 

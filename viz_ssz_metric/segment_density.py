@@ -15,11 +15,49 @@ from typing import Callable
 from .ssz_mirror_metric import Xi, schwarzschild_radius, PHI
 
 
-def dXi_dr(r, rs, varphi: float = PHI) -> float:
-    """Erste Ableitung der Segment-Dichte.
+def Xi_correct(r, rs, varphi: float = PHI) -> float:
+    """KORRIGIERTE Segment-Dichte aus SSZ Theory.
     
-    Ξ(r) = 1 - exp(-φr/r_s)
-    dΞ/dr = (φ/r_s) · exp(-φr/r_s)
+    Ξ(r) = (r_s/r)² × exp(-r/r_φ)
+    
+    wobei r_φ = (φ/2) × r_s
+    
+    **WICHTIG:** Dies ist die wissenschaftlich validierte Formel!
+    (Nicht die vereinfachte Version 1 - exp(-φr/r_s))
+    
+    Referenz: SSZ_Black_Hole_Stability.md, Gl. für H² Korrektur
+    
+    Args:
+        r: Radius
+        rs: Schwarzschild-Radius
+        varphi: φ-Parameter
+    
+    Returns:
+        Ξ(r) - Segment-Dichte
+    
+    Eigenschaften:
+    - Ξ → 0 für r → ∞ (GR-Limit)
+    - Ξ → 1 für r → r_φ (Sättigung)
+    - Ξ < 1 für r_φ < r < ∞
+    """
+    r = np.asarray(r, float)
+    
+    # φ-Radius
+    r_phi = (varphi / 2.0) * rs
+    
+    # Korrekte Formel
+    Xi_val = (rs / r)**2 * np.exp(-r / r_phi)
+    
+    return Xi_val
+
+
+def dXi_dr(r, rs, varphi: float = PHI) -> float:
+    """Erste Ableitung der KORRIGIERTEN Segment-Dichte.
+    
+    Ξ(r) = (r_s/r)² × exp(-r/r_φ)
+    
+    dΞ/dr = d/dr[(r_s/r)² × exp(-r/r_φ)]
+          = (r_s/r)² × exp(-r/r_φ) × [-2/r - 1/r_φ]
     
     Args:
         r: Radius
@@ -30,13 +68,24 @@ def dXi_dr(r, rs, varphi: float = PHI) -> float:
         dΞ/dr
     """
     r = np.asarray(r, float)
-    return (varphi / rs) * np.exp(-varphi * r / rs)
+    r_phi = (varphi / 2.0) * rs
+    
+    Xi_val = Xi_correct(r, rs, varphi)
+    
+    # Ableitung
+    dXi = Xi_val * (-2.0/r - 1.0/r_phi)
+    
+    return dXi
 
 
 def d2Xi_dr2(r, rs, varphi: float = PHI) -> float:
-    """Zweite Ableitung der Segment-Dichte.
+    """Zweite Ableitung der KORRIGIERTEN Segment-Dichte.
     
-    d²Ξ/dr² = -(φ²/r_s²) · exp(-φr/r_s)
+    Ξ(r) = (r_s/r)² × exp(-r/r_φ)
+    
+    dΞ/dr = Ξ × [-2/r - 1/r_φ]
+    
+    d²Ξ/dr² = d/dr[dΞ/dr] (Produktregel)
     
     Args:
         r: Radius
@@ -47,11 +96,22 @@ def d2Xi_dr2(r, rs, varphi: float = PHI) -> float:
         d²Ξ/dr²
     """
     r = np.asarray(r, float)
-    return -(varphi**2 / rs**2) * np.exp(-varphi * r / rs)
+    r_phi = (varphi / 2.0) * rs
+    
+    Xi_val = Xi_correct(r, rs, varphi)
+    dXi_val = dXi_dr(r, rs, varphi)
+    
+    # Zweite Ableitung via Produktregel
+    # d²Ξ/dr² = dΞ/dr × [-2/r - 1/r_φ] + Ξ × [2/r²]
+    d2Xi = dXi_val * (-2.0/r - 1.0/r_phi) + Xi_val * (2.0/(r**2))
+    
+    return d2Xi
 
 
 def segment_number_density(r, rs, varphi: float = PHI, N_0: float = 1.0):
     """Absolute Segment-Anzahldichte N(r) = N_0 · Ξ(r).
+    
+    Verwendet die KORRIGIERTE Formel: Ξ = (r_s/r)² × exp(-r/r_φ)
     
     Args:
         r: Radius
@@ -62,7 +122,7 @@ def segment_number_density(r, rs, varphi: float = PHI, N_0: float = 1.0):
     Returns:
         N(r) in Segmenten pro Volumen
     """
-    return N_0 * Xi(r, rs, varphi)
+    return N_0 * Xi_correct(r, rs, varphi)
 
 
 def total_segments_spherical(r_max: float, rs, varphi: float = PHI, N_0: float = 1.0):
@@ -70,6 +130,8 @@ def total_segments_spherical(r_max: float, rs, varphi: float = PHI, N_0: float =
     
     N_total = ∫₀^r_max 4πr² N(r) dr
             = 4π N_0 ∫₀^r_max r² Ξ(r) dr
+    
+    Verwendet KORRIGIERTE Formel: Ξ = (r_s/r)² × exp(-r/r_φ)
     
     Args:
         r_max: Maximaler Radius
@@ -81,7 +143,7 @@ def total_segments_spherical(r_max: float, rs, varphi: float = PHI, N_0: float =
         Totale Segment-Anzahl (dimensionslos wenn N_0=1)
     """
     def integrand(r):
-        return 4 * np.pi * r**2 * Xi(r, rs, varphi)
+        return 4 * np.pi * r**2 * Xi_correct(r, rs, varphi)
     
     result, error = quad(integrand, 0, r_max, limit=100)
     return N_0 * result

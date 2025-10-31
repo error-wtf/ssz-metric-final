@@ -4,6 +4,10 @@ Test Shadow Radius implementation.
 Tests shadow_radius() and EHT comparison methods.
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import pytest
 import numpy as np
 from viz_ssz_metric.unified_metric import UnifiedSSZMetric
@@ -20,7 +24,7 @@ def test_shadow_coordinate():
     b_expected = np.sqrt(27) / 2 * metric.r_s
     
     assert 0.8 * b_expected < b_crit < 1.2 * b_expected
-    print(f"✓ Shadow radius: {b_crit/metric.r_s:.3f} r_s")
+    print(f"[OK] Shadow radius: {b_crit/metric.r_s:.3f} r_s")
 
 
 def test_shadow_angular():
@@ -35,7 +39,7 @@ def test_shadow_angular():
     assert shadow > 0
     assert shadow < 1000  # Less than 1 mas
     
-    print(f"✓ Shadow at 10 kpc: {shadow:.2f} μas")
+    print(f"[OK] Shadow at 10 kpc: {shadow:.2f} μas")
 
 
 def test_shadow_sgr_a_star():
@@ -57,7 +61,7 @@ def test_shadow_sgr_a_star():
         distance_kpc=distance_kpc
     )
     
-    print(f"\n✓ Sgr A* Shadow Comparison:")
+    print(f"\n[OK] Sgr A* Shadow Comparison:")
     print(f"  Predicted: {comparison['predicted_microarcsec']:.1f} μas")
     print(f"  Observed:  {comparison['observed_microarcsec']:.1f} μas")
     print(f"  Residual:  {comparison['relative_residual']:.1%}")
@@ -66,7 +70,7 @@ def test_shadow_sgr_a_star():
     
     # Additional checks
     assert 40 < comparison['predicted_microarcsec'] < 65
-    print(f"  ✓ Within EHT uncertainty range")
+    print(f"  [OK] Within EHT uncertainty range")
 
 
 def test_shadow_mass_scaling():
@@ -83,7 +87,7 @@ def test_shadow_mass_scaling():
     
     # Should be ~10 (linear with mass)
     assert 9 < ratio < 11
-    print(f"✓ Shadow scaling: θ(10M) / θ(M) = {ratio:.2f} (expect ~10)")
+    print(f"[OK] Shadow scaling: θ(10M) / θ(M) = {ratio:.2f} (expect ~10)")
 
 
 def test_shadow_distance_scaling():
@@ -97,7 +101,7 @@ def test_shadow_distance_scaling():
     
     # Should be ~2 (inverse with distance)
     assert 1.8 < ratio < 2.2
-    print(f"✓ Distance scaling: θ(10kpc) / θ(20kpc) = {ratio:.2f} (expect ~2)")
+    print(f"[OK] Distance scaling: θ(10kpc) / θ(20kpc) = {ratio:.2f} (expect ~2)")
 
 
 if __name__ == "__main__":

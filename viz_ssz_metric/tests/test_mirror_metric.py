@@ -166,12 +166,133 @@ def test_SSZ_vs_GR_values_at_rstar():
     assert abs(D_ssz - D_gr) < 1e-8, f"SSZ≠GR am Schnittpunkt! Diff={abs(D_ssz-D_gr)}"
 
 
+def test_post_newtonian_series():
+    """Test: Post-Newtonsche Serie A(r) = 1 - 2U + 2U² + ε₃U³"""
+    from viz_ssz_metric.ssz_mirror_metric import (
+        weak_field_parameter, metric_functions_pn, schwarzschild_radius
+    )
+    
+    # Sonnenmasse
+    M_sun = 1.98847e30  # kg
+    rs = schwarzschild_radius(M_sun)
+    
+    # Schwaches Feld: r = 10 r_s
+    r = 10 * rs
+    U = weak_field_parameter(M_sun, r)
+    A, B = metric_functions_pn(M_sun, r)
+    
+    print(f"\n✅ Test Post-Newtonsche Serie bei r = 10r_s:")
+    print(f"   U = {U:.6e}")
+    print(f"   A(r) = {A:.10f}")
+    print(f"   B(r) = {B:.10f}")
+    print(f"   ε₃ = -24/5 = {-24/5:.6f}")
+    
+    # Erwartete Werte (analytisch)
+    A_expected = 1.0 - 2*U + 2*U**2 + (-24/5)*U**3
+    
+    assert abs(A - A_expected) < 1e-12, f"A-Serie fehlerhaft! {A} ≠ {A_expected}"
+    assert B == pytest.approx(1/A), "B ≠ 1/A!"
+    
+    # Fernfeld: A → 1
+    r_far = 1000 * rs
+    A_far, _ = metric_functions_pn(M_sun, r_far)
+    assert A_far > 0.999, f"Fernfeld: A({r_far/rs:.0f}r_s) = {A_far} sollte ≈1 sein"
+
+
+def test_metric_tensor_components():
+    """Test: Vollständiger 4×4 metrischer Tensor"""
+    from viz_ssz_metric.ssz_mirror_metric import metric_tensor, schwarzschild_radius
+    import math
+    
+    M = 1.98847e30  # 1 M☉
+    rs = schwarzschild_radius(M)
+    r = 5 * rs
+    theta = math.pi / 4  # 45°
+    
+    g = metric_tensor(M, r, theta)
+    
+    print(f"\n✅ Test Metrischer Tensor bei r=5r_s, θ=π/4:")
+    print(f"   g_tt = {g[0][0]:.6f} (sollte < 0 sein)")
+    print(f"   g_rr = {g[1][1]:.6f} (sollte > 0 sein)")
+    print(f"   g_θθ = {g[2][2]:.6f} (= r²)")
+    print(f"   g_φφ = {g[3][3]:.6f} (= r²sin²θ)")
+    
+    # Signatur-Check
+    assert g[0][0] < 0, "g_tt sollte negativ sein (Signatur -,+,+,+)"
+    assert g[1][1] > 0, "g_rr sollte positiv sein"
+    assert g[2][2] > 0, "g_θθ sollte positiv sein"
+    assert g[3][3] > 0, "g_φφ sollte positiv sein"
+    
+    # Winkelkomponenten
+    assert g[2][2] == pytest.approx(r**2), "g_θθ ≠ r²"
+    assert g[3][3] == pytest.approx(r**2 * math.sin(theta)**2, rel=1e-10), "g_φφ ≠ r²sin²θ"
+    
+    # Off-diagonal = 0
+    for i in range(4):
+        for j in range(4):
+            if i != j:
+                assert g[i][j] == 0.0, f"Off-diagonal g[{i}][{j}] ≠ 0"
+
+
+def test_proper_time_vs_coordinate_time():
+    """Test: Eigenzeit-Dilatation D(r) = √|g_tt|"""
+    from viz_ssz_metric.ssz_mirror_metric import proper_time_dilation, schwarzschild_radius
+    
+    M = 1.98847e30
+    rs = schwarzschild_radius(M)
+    
+    # Bei r = ∞: D = 1 (keine Dilatation)
+    r_far = 100 * rs
+    D_far = proper_time_dilation(M, r_far)
+    
+    # Bei r = 2r_s: D < 1 (starke Dilatation)
+    r_near = 2 * rs
+    D_near = proper_time_dilation(M, r_near)
+    
+    print(f"\n✅ Test Eigenzeit-Dilatation:")
+    print(f"   D(100r_s) = {D_far:.10f} (sollte ≈1 sein)")
+    print(f"   D(2r_s) = {D_near:.10f} (sollte < 1 sein)")
+    
+    assert D_far > 0.99, f"Fernfeld-Dilatation zu groß: {D_far}"
+    assert D_near < D_far, "Zeitdilatation sollte bei kleinerem r stärker sein"
+    assert 0 < D_near < 1, f"D_near außerhalb physikalischem Bereich: {D_near}"
+
+
+def test_intersection_high_precision():
+    """Test: High-precision Schnittpunkt mit mpmath"""
+    from viz_ssz_metric.ssz_mirror_metric import intersection_time_dilation, HAS_MPMATH
+    
+    if not HAS_MPMATH:
+        print("\n⚠️  mpmath nicht verfügbar, überspringe high-precision Test")
+        return
+    
+    # φ = 1.0
+    result_1 = intersection_time_dilation(varphi=1.0)
+    u1, D1 = result_1['u'], result_1['D']
+    
+    # φ = Golden Ratio
+    result_phi = intersection_time_dilation(varphi=(1+5**0.5)/2)
+    u_phi, D_phi = result_phi['u'], result_phi['D']
+    
+    print(f"\n✅ Test Intersection (mpmath high-precision):")
+    print(f"   φ=1.0:  u* = {u1:.12f}, D* = {D1:.12f}")
+    print(f"   φ=φ:    u* = {u_phi:.12f}, D* = {D_phi:.12f}")
+    
+    # Referenzwerte (aus Theorie)
+    assert abs(u1 - 1.4689714056) < 1e-8, f"u*(φ=1.0) = {u1} weicht ab!"
+    assert abs(D1 - 0.5650235) < 1e-6, f"D*(φ=1.0) = {D1} weicht ab!"
+    
+    assert 1.38 < u_phi < 1.40, f"u*(φ=φ) = {u_phi} außerhalb erwarteter Range"
+    assert 0.52 < D_phi < 0.54, f"D*(φ=φ) = {D_phi} außerhalb erwarteter Range"
+
+
 if __name__ == "__main__":
     # Kann auch direkt ausgeführt werden
     print("="*80)
-    print("SSZ MIRROR METRIC TESTS")
+    print("SSZ FULL METRIC TESTS (Mirror-Blend + Post-Newtonsche Serie)")
     print("="*80)
     
+    # Original Mirror-Blend Tests
     test_intersection_phi_1()
     test_intersection_phi_golden()
     test_A_safe_positive_and_farfield()
@@ -179,6 +300,12 @@ if __name__ == "__main__":
     test_mirror_blend_smoothness()
     test_SSZ_vs_GR_values_at_rstar()
     
+    # Neue Post-Newtonsche Tests
+    test_post_newtonian_series()
+    test_metric_tensor_components()
+    test_proper_time_vs_coordinate_time()
+    test_intersection_high_precision()
+    
     print("\n" + "="*80)
-    print("✅ ALL TESTS PASSED!")
+    print("✅ ALL 10 TESTS PASSED!")
     print("="*80)

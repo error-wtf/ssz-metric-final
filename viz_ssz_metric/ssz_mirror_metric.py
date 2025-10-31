@@ -1,18 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-Singularitätenfreie SSZ–GR Mirror-Metrik (sphärisch symmetrisch, statisch).
+Vollständige SSZ-Metrik: Post-Newtonsche Serie + Mirror-Blend.
+
+Dieses Modul implementiert ZWEI komplementäre Ansätze für die SSZ-Metrik:
+
+1. **Post-Newtonsche Serie** (schwaches Feld, analytisch):
+   A(r) = 1 - 2U + 2U² + ε₃U³ + ...
+   wobei U = GM/(c²r) und ε₃ = -24/5
+
+2. **Mirror-Blend** (starkes Feld, numerisch):
+   Glatter Übergang SSZ ↔ GR am Schnittpunkt r* mit Softplus-Floor
 
 Basierend auf der Segmented Spacetime Theorie von Carmen Wrede & Lino Casu.
 
-Linienelement:
-    ds² = -A_safe(r) dt² + B_safe(r) dr² + r²dΩ²
+Linienelement (sphärisch symmetrisch, statisch):
+    ds² = -A(r)dt² + B(r)dr² + r²dθ² + r²sin²θ dφ²
 
 © 2025 Carmen Wrede & Lino Casu
 Licensed under the ANTI-CAPITALIST SOFTWARE LICENSE v1.4
 """
 from __future__ import annotations
+import math
+from typing import Tuple, Optional
 import numpy as np
 from scipy.optimize import brentq
+
+try:
+    import mpmath as mp
+    HAS_MPMATH = True
+except ImportError:
+    HAS_MPMATH = False
 
 # Physikalische Konstanten
 G_DEFAULT = 6.67430e-11  # m³/(kg·s²)
@@ -168,3 +185,209 @@ def curvature_proxy(r, A):
     dr = r[1] - r[0]
     dA = np.gradient(A, dr)
     return (dA / np.maximum(r, 1e-12))**2 + ((1.0 - A) / np.maximum(r*r, 1e-12))**2
+
+
+# ============================================================================
+# POST-NEWTONSCHE SERIE (Analytische Lösung im schwachen Feld)
+# ============================================================================
+
+def weak_field_parameter(mass: float, r: float, G: float = G_DEFAULT, c: float = C_DEFAULT) -> float:
+    """Dimensionsloser Schwachfeldparameter U(r) = GM/(c²r) = r_s/(2r).
+    
+    Args:
+        mass: Masse in kg
+        r: Radialer Koordinatenwert in m
+        G: Gravitationskonstante (SI)
+        c: Lichtgeschwindigkeit (SI)
+    
+    Returns:
+        U(r) dimensionslos
+    """
+    return (G * mass) / (c * c * r)
+
+
+def metric_functions_pn(mass: float, r: float, 
+                        G: float = G_DEFAULT, 
+                        c: float = C_DEFAULT,
+                        epsilon3: float = -24.0/5.0) -> Tuple[float, float]:
+    """Post-Newtonsche Serie A(r) und B(r) = 1/A(r).
+    
+    SSZ-Metrik (schwaches Feld):
+        A(r) = 1 - 2U + 2U² + ε₃U³ + O(U⁴)
+        B(r) = 1/A(r)
+    
+    mit U = GM/(c²r) und ε₃ = -24/5.
+    
+    Diese Serie trunciert bei O(U³). Für starke Felder (r ≈ r_s) sollte
+    die Mirror-Blend-Funktion A_safe() verwendet werden.
+    
+    Args:
+        mass: Masse in kg
+        r: Radius in m
+        G: Gravitationskonstante
+        c: Lichtgeschwindigkeit
+        epsilon3: Kubischer Koeffizient (default: -24/5)
+    
+    Returns:
+        Tuple (A(r), B(r))
+    
+    Raises:
+        ValueError: wenn A(r) ≤ 0 (Metrik-Singularität)
+    """
+    U = weak_field_parameter(mass, r, G, c)
+    
+    # Post-Newtonsche Serie
+    A = 1.0 - 2.0 * U + 2.0 * (U ** 2) + epsilon3 * (U ** 3)
+    
+    # Höhere Ordnungen können hier ergänzt werden:
+    # A += epsilon4 * (U ** 4) + ...
+    
+    if A <= 0:
+        raise ValueError(
+            f"Metrik-Singularität: A(r) = {A:.3e} ≤ 0 bei r = {r:.3e} m. "
+            f"Verwende A_safe() für starke Felder."
+        )
+    
+    B = 1.0 / A
+    return A, B
+
+
+def metric_tensor(mass: float, r: float, theta: float,
+                  G: float = G_DEFAULT, 
+                  c: float = C_DEFAULT) -> Tuple[Tuple[float, float, float, float], ...]:
+    """Vollständiger diagonaler metrischer Tensor g_μν(r,θ) im SSZ-Modell.
+    
+    Linienelement:
+        ds² = -A(r)dt² + B(r)dr² + r²dθ² + r²sin²θ dφ²
+    
+    Signatur: (-,+,+,+)
+    Koordinaten: (t, r, θ, φ)
+    
+    Args:
+        mass: Masse in kg
+        r: Radialer Koordinatenwert in m
+        theta: Polwinkel θ in Radiant
+        G: Gravitationskonstante
+        c: Lichtgeschwindigkeit
+    
+    Returns:
+        4×4 Matrix des metrischen Tensors als nested tuple:
+        ((g_tt, 0, 0, 0),
+         (0, g_rr, 0, 0),
+         (0, 0, g_θθ, 0),
+         (0, 0, 0, g_φφ))
+    """
+    A, B = metric_functions_pn(mass, r, G, c)
+    
+    # Diagonale Komponenten
+    g_tt = -A
+    g_rr = B
+    g_thth = r ** 2
+    g_phph = (r ** 2) * (math.sin(theta) ** 2)
+    
+    # 4×4 Tensor (Off-diagonal = 0 für sphärische Symmetrie)
+    return (
+        (g_tt, 0.0, 0.0, 0.0),
+        (0.0, g_rr, 0.0, 0.0),
+        (0.0, 0.0, g_thth, 0.0),
+        (0.0, 0.0, 0.0, g_phph),
+    )
+
+
+def proper_time_dilation(mass: float, r: float,
+                         G: float = G_DEFAULT,
+                         c: float = C_DEFAULT) -> float:
+    """Eigenzeit-Dilatation D(r) = √|g_tt| für stationäre Beobachter.
+    
+    Gibt an, wie viele Eigenzeit-Sekunden pro Koordinatenzeit-Sekunde
+    für einen ruhenden Beobachter bei Radius r vergehen.
+    
+    Dies basiert auf der Post-Newtonschen A(r), NICHT auf der 
+    vereinfachten 1/(1+Ξ)-Formel.
+    
+    Args:
+        mass: Masse in kg
+        r: Radius in m
+        G: Gravitationskonstante
+        c: Lichtgeschwindigkeit
+    
+    Returns:
+        D(r) ∈ (0, 1] (1 = unendlich fern, →0 am Horizont)
+    """
+    A, _ = metric_functions_pn(mass, r, G, c)
+    # g_tt = -A, daher |g_tt| = A (falls A > 0)
+    return math.sqrt(abs(A))
+
+
+# ============================================================================
+# INTERSECTION POINT (high-precision mit mpmath)
+# ============================================================================
+
+def intersection_time_dilation(varphi: float = PHI, 
+                               tol: float = 1e-12) -> dict:
+    """Berechne Schnittpunkt u* und D* zwischen GR und SSZ (high precision).
+    
+    Löst: sqrt(1 - 1/u) = 1/(2 - exp(-φ·u))
+    
+    wobei u = r/r_s (dimensionslos).
+    
+    Args:
+        varphi: φ-Parameter (default: Golden Ratio)
+        tol: Relative Toleranz für Root-Finding (default: 1e-12)
+    
+    Returns:
+        dict mit Keys:
+            - 'u': Dimensionsloser Schnittpunkt u* = r*/r_s
+            - 'D': Gemeinsame Zeitdilatation D* = D_GR(r*) = D_SSZ(r*)
+    
+    Beispiel:
+        >>> result = intersection_time_dilation(varphi=1.0)
+        >>> print(f"u* = {result['u']:.10f}, D* = {result['D']:.10f}")
+        u* = 1.4689714056, D* = 0.5650234996
+    
+    Raises:
+        RuntimeError: wenn keine Konvergenz erreicht wird
+        ImportError: wenn mpmath nicht verfügbar (Fallback zu scipy)
+    """
+    if HAS_MPMATH:
+        # High-precision mit mpmath
+        def f(u):
+            return mp.sqrt(1.0 - 1.0 / u) - 1.0 / (2.0 - mp.e ** (-varphi * u))
+        
+        # Versuche mehrere Startpunkte
+        guesses = [1.2, 1.3, 1.4, 1.5, 2.0]
+        root = None
+        
+        for guess in guesses:
+            try:
+                root = mp.findroot(f, guess)
+                u = float(mp.re(root))
+                if u > 1.0:
+                    break
+            except Exception:
+                continue
+        
+        if root is None or u <= 1.0:
+            raise RuntimeError(
+                f"mpmath findroot failed for varphi={varphi}. "
+                f"Try different initial guesses."
+            )
+        
+        # Berechne D* bei u*
+        D_val = math.sqrt(1.0 - 1.0 / u)
+        
+        return {"u": u, "D": D_val}
+    
+    else:
+        # Fallback zu scipy (niedrigere Präzision)
+        def equation(u):
+            return math.sqrt(1.0 - 1.0 / u) - 1.0 / (2.0 - math.exp(-varphi * u))
+        
+        try:
+            u = brentq(equation, 1.01, 3.0, xtol=tol)
+            D_val = math.sqrt(1.0 - 1.0 / u)
+            return {"u": u, "D": D_val}
+        except ValueError as e:
+            raise RuntimeError(
+                f"scipy brentq failed for varphi={varphi}: {e}"
+            )

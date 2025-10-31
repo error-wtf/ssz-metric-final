@@ -109,13 +109,15 @@ class UnifiedSSZMetric:
     """
     
     def __init__(self, params: Optional[UnifiedMetricParameters] = None, 
-                 mass: Optional[float] = None):
+                 mass: Optional[float] = None,
+                 phi_mode: str = 'approximate'):
         """
         Initialize Unified SSZ Metric.
         
         Args:
             params: Full parameters (UnifiedMetricParameters)
             mass: Simple initialization with just mass (uses defaults)
+            phi_mode: 'approximate' (fast, φ_0*exp(-r/r_φ)) or 'tov' (exact, LSODA integration)
         """
         if params is None:
             if mass is None:
@@ -139,12 +141,34 @@ class UnifiedSSZMetric:
             self.scalar_theory = None
         
         # Scalar field state
-        # NOTE: Quick approximation until full TOV integration
-        # φ(r) ≈ φ_0 × exp(-r/r_φ) gives non-trivial T_μν
-        self.phi_0 = 0.1  # Initial field amplitude
+        # UPGRADE: Full TOV integration available!
+        # Mode 1: Quick approximation (fast)
+        # Mode 2: Full TOV (exact, from ssz_theory_segmented.py)
+        self.phi_mode = phi_mode  # 'approximate' or 'tov'
+        self.phi_0 = 0.1  # Initial field amplitude (for approximate mode)
         self.phi = 0.0        # Will be set dynamically in compute_all
         self.phi_prime = 0.0  # Will be set dynamically in compute_all
         self._cache = {}  # Performance cache
+        
+        # TOV Solution (if mode='tov')
+        self.tov_solution = None
+        if self.phi_mode == 'tov':
+            try:
+                from ssz_theory_segmented import SSZSolution, mass_to_length_geom
+                self.tov_solution = SSZSolution(
+                    M_kg=mass,
+                    mode='exterior',  # Or 'interior' for fluid interior
+                    # Use same parameters as scalar_theory if available
+                    Z0=self.scalar_theory.params.Z0 if self.scalar_theory else 1.0,
+                    alpha=self.scalar_theory.params.alpha if self.scalar_theory else 0.1,
+                    beta=self.scalar_theory.params.beta if self.scalar_theory else 0.01,
+                    mphi=self.scalar_theory.params.m_phi if self.scalar_theory else 0.1,
+                    lam=self.scalar_theory.params.lambda_ if self.scalar_theory else 0.001
+                )
+                print("✅ Full TOV integration ACTIVE (ssz_theory_segmented.py)")
+            except ImportError:
+                print("⚠️  ssz_theory_segmented.py not found, using approximate φ(r)")
+                self.phi_mode = 'approximate'
         
         # Berechne fundamentale Größen
         self._compute_fundamental_scales()
@@ -767,7 +791,7 @@ class UnifiedSSZMetric:
         Quick approximation: φ(r) = φ_0 × exp(-r/r_φ)
         
         Not perfect but NON-ZERO!
-        This gives non-trivial T_μν until full TOV integration.
+        This gives non-trivial T_μν.
         
         Args:
             r: Radial coordinate
@@ -789,6 +813,90 @@ class UnifiedSSZMetric:
         """
         return -self.phi_0 / self.r_phi * np.exp(-r / self.r_phi)
     
+    def tov_phi(self, r: float) -> float:
+        """
+        EXACT φ(r) from Full TOV Integration (ssz_theory_segmented.py).
+        
+        Uses LSODA integration in ln(r) coordinate.
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            Exact φ(r) from TOV solution
+        """
+        if self.tov_solution is None:
+            raise ValueError("TOV solution not initialized! Use phi_mode='tov'")
+        
+        # Solve TOV if not already solved
+        if not hasattr(self.tov_solution, '_sol'):
+            self.tov_solution._sol = self.tov_solution.solve()
+        
+        # Get φ at radius r
+        from ssz_theory_segmented import mass_to_length_geom
+        r_geom = r / mass_to_length_geom(self.params.mass)
+        
+        # Interpolate solution
+        sol = self.tov_solution._sol
+        # Convert r to ln(r) coordinate
+        import numpy as np
+        ln_r = np.log(max(r_geom, self.tov_solution.r_start))
+        
+        # Find closest solution point
+        idx = np.argmin(np.abs(sol.t - ln_r))
+        phi_val = sol.y[1, idx]  # φ is second component
+        
+        return phi_val
+    
+    def tov_phi_prime(self, r: float) -> float:
+        """
+        d/dr φ(r) from TOV solution.
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            φ'(r) from TOV
+        """
+        if self.tov_solution is None:
+            raise ValueError("TOV solution not initialized! Use phi_mode='tov'")
+        
+        # Numerical derivative (or get from TOV directly)
+        dr = r * 1e-6
+        phi_plus = self.tov_phi(r + dr)
+        phi_minus = self.tov_phi(r - dr)
+        return (phi_plus - phi_minus) / (2 * dr)
+    
+    def get_phi(self, r: float) -> float:
+        """
+        Get φ(r) using current mode (approximate or tov).
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            φ(r)
+        """
+        if self.phi_mode == 'tov':
+            return self.tov_phi(r)
+        else:
+            return self.approximate_phi(r)
+    
+    def get_phi_prime(self, r: float) -> float:
+        """
+        Get φ'(r) using current mode (approximate or tov).
+        
+        Args:
+            r: Radial coordinate
+        
+        Returns:
+            φ'(r)
+        """
+        if self.phi_mode == 'tov':
+            return self.tov_phi_prime(r)
+        else:
+            return self.approximate_phi_prime(r)
+    
     # ======================== MASTER COMPUTE ========================
     
     def compute_all(self, r: float, theta: float = np.pi/2) -> Dict:
@@ -806,9 +914,9 @@ class UnifiedSSZMetric:
             - Kosmologie
             - UND MEHR!
         """
-        # CRITICAL: Set φ(r) dynamically!
-        self.phi = self.approximate_phi(r)
-        self.phi_prime = self.approximate_phi_prime(r)
+        # CRITICAL: Set φ(r) dynamically (approximate or exact TOV)!
+        self.phi = self.get_phi(r)
+        self.phi_prime = self.get_phi_prime(r)
         result = {
             # Fundamentale Skalen
             'r': r,

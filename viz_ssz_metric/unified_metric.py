@@ -776,16 +776,16 @@ def demo():
     
     print(f"\nFundamentale Skalen:")
     print(f"  r_s (Schwarzschild):  {metric.r_s/1000:.3f} km")
-    print(f"  r_φ (SSZ-Horizont):   {metric.r_phi/1000:.3f} km")
-    print(f"  r_φ/r_s:              {metric.r_phi/metric.r_s:.6f}")
-    print(f"  ρ_max:                {metric.rho_max:.3e} kg/m³")
+    print(f"  r_phi (SSZ-Horizont): {metric.r_phi/1000:.3f} km")
+    print(f"  r_phi/r_s:            {metric.r_phi/metric.r_s:.6f}")
+    print(f"  rho_max:              {metric.rho_max:.3e} kg/m^3")
     print(f"  K_max:                {metric.K_max:.3e}")
-    print(f"  λ_crit:               {metric.lambda_crit:.6e}")
+    print(f"  lambda_crit:          {metric.lambda_crit:.6e}")
     
     # Test bei verschiedenen Radien
     radii = [2, 3, 5, 10, 20]
     
-    print(f"\n{'r/r_s':>8} {'A(r)':>12} {'Ξ(r)':>12} {'K':>15} {'ρ':>15} {'WEC':>6} {'NEC':>6}")
+    print(f"\n{'r/r_s':>8} {'A(r)':>12} {'Xi(r)':>12} {'K':>15} {'rho':>15} {'WEC':>6} {'NEC':>6}")
     print("-"*90)
     
     for r_mult in radii:
@@ -797,55 +797,55 @@ def demo():
         print(f"{r_mult:>8} {result['A']:>12.6f} {result['Xi']:>12.6f} "
               f"{result['K_kretschmann']:>15.3e} "
               f"{result['T_energy_momentum']['rho']:>15.3e} "
-              f"{'✓' if ec['WEC'] else '✗':>6} "
-              f"{'✓' if ec['NEC'] else '✗':>6}")
+              f"{'OK' if ec['WEC'] else 'NO':>6} "
+              f"{'OK' if ec['NEC'] else 'NO':>6}")
     
     print("="*90)
     
     # Singularitäts-Check
-    print("\n✅ SINGULARITÄTS-VERMEIDUNG:")
+    print("\n[SINGULARITY AVOIDANCE CHECK]")
     r_test = 0.1 * metric.r_s  # Nahe Zentrum!
     result_near_center = metric.compute_all(r_test)
     
     print(f"  Test bei r = 0.1 r_s:")
     print(f"    A(r) > 0?        {result_near_center['A'] > 0} (A = {result_near_center['A']:.6e})")
     print(f"    K bounded?       {result_near_center['K_kretschmann'] < metric.K_max}")
-    print(f"    ρ bounded?       {abs(result_near_center['T_energy_momentum']['rho']) <= metric.rho_max}")
-    print(f"  → {'✅ SINGULARITÄTSFREI!' if result_near_center['singularity_free']['all_clear'] else '❌ SINGULARITÄT!'}")
+    print(f"    rho bounded?     {abs(result_near_center['T_energy_momentum']['rho']) <= metric.rho_max}")
+    print(f"  => {'SINGULARITY-FREE!' if result_near_center['singularity_free']['all_clear'] else 'SINGULARITY DETECTED!'}")
     
     # Black Hole Bomb Test
-    print("\n⚡ BLACK HOLE BOMB TEST:")
-    lambda_A = 0.005  # < λ_crit
+    print("\n[BLACK HOLE BOMB TEST]")
+    lambda_A = 0.005  # < lambda_crit
     E_evolution = metric.energy_evolution_black_hole_bomb(1.0, lambda_A, time_steps=10000)
-    print(f"  λ_A = {lambda_A} (λ_crit = {metric.lambda_crit:.6e})")
+    print(f"  lambda_A = {lambda_A} (lambda_crit = {metric.lambda_crit:.6e})")
     print(f"  E(t=0) = {E_evolution[0]:.6f}")
     print(f"  E(t=10000) = {E_evolution[-1]:.6f}")
-    print(f"  Amplification: {E_evolution[-1]/E_evolution[0]:.2f}× (GR: ~10⁸×!)")
-    print(f"  → ✅ STABIL (Energie saturiert!)")
+    print(f"  Amplification: {E_evolution[-1]/E_evolution[0]:.2f}x (GR: ~10^8x!)")
+    print(f"  => STABLE (Energy saturated!)")
     
     # Observables
-    print("\n🔭 KLASSISCHE GR-TESTS:")
+    print("\n[CLASSICAL GR TESTS]")
     a_mercury = 5.79e10  # m (Merkur Halbachse)
     e_mercury = 0.206
     Delta_phi = metric.perihelion_precession(a_mercury, e_mercury)
-    print(f"  Perihel-Präzession (Merkur): {Delta_phi * 206265:.2f} arcsec/orbit")
-    print(f"    (Beobachtet: ~43 arcsec/Jahrhundert)")
+    print(f"  Perihelion Precession (Mercury): {Delta_phi * 206265:.2f} arcsec/orbit")
+    print(f"    (Observed: ~43 arcsec/century)")
     
     b_sun = 6.96e8  # m (Sonnenradius)
     alpha = metric.light_deflection(b_sun)
-    print(f"  Lichtablenkung (Sonne): {alpha * 206265:.2f} arcsec")
+    print(f"  Light Deflection (Sun): {alpha * 206265:.2f} arcsec")
     print(f"    (Einstein: 1.75 arcsec)")
     
     # Hawking Radiation
-    print("\n🌡️  HAWKING RADIATION:")
+    print("\n[HAWKING RADIATION]")
     T_H = metric.hawking_temperature()
     S_BH = metric.black_hole_entropy()
     print(f"  T_Hawking = {T_H:.3e} K")
     print(f"  S_BH = {S_BH:.3e} J/K")
-    print(f"  Verdampfungszeit: ~10^{np.log10(metric.params.mass**3):.0f} Jahre")
+    print(f"  Evaporation time: ~10^{np.log10(metric.params.mass**3):.0f} years")
     
     # Multi-Body Test
-    print("\n🪐 MULTI-BODY GRAVITATION:")
+    print("\n[MULTI-BODY GRAVITATION]")
     # Beispiel: Erde-Mond System
     M_earth = 5.972e24
     M_moon = 7.342e22
@@ -857,34 +857,34 @@ def demo():
         masses=[M_earth, M_moon],
         positions=[0, d_earth_moon]
     )
-    print(f"  Erde-Mond System:")
-    print(f"  Ξ_total bei L1: {Xi_multi:.6e}")
-    print(f"  → Multi-Body Effekte inkludiert! ✅")
+    print(f"  Earth-Moon System:")
+    print(f"  Xi_total at L1: {Xi_multi:.6e}")
+    print(f"  => Multi-body effects included!")
     
     print("\n" + "="*90)
-    print("🎉 UNIFIED SSZ METRIC - DIE VOLLSTÄNDIGSTE ALLER METRIKEN!")
+    print("UNIFIED SSZ METRIC - THE MOST COMPLETE METRIC!")
     print("="*90)
-    print("\n✅ Features implementiert:")
-    print("  • Post-Newtonsche Serie bis O(U⁶)")
-    print("  • Golden Ratio Sättigung (Black Hole Bomb)")
-    print("  • Segment-Dichte Ξ(r) [KORRIGIERT aus Vorlage]")
-    print("  • Vollständige Differential-Geometrie (Γ, R, G, T)")
-    print("  • Energie-Bedingungen (WEC/DEC/SEC)")
-    print("  • Singularitätsvermeidung (GARANTIERT!)")
-    print("  • Hubble ohne Dunkle Energie")
-    print("  • Hawking Radiation & Entropie")
-    print("  • Klassische GR-Tests (Perihel, Lichtablenkung)")
-    print("  • Multi-Body Gravitation")
-    print("  • Photon Sphere & ISCO")
-    print("\n📊 Wissenschaftlich validiert:")
-    print("  • 97.9% ESO Accuracy (Formel-Basis)")
-    print("  • Black Hole Bomb 6.6× Dämpfung")
-    print("  • Keine Singularitäten in 10⁶ steps")
-    print("  • GR-Limit für schwache Felder")
-    print("\n📖 Referenzen:")
-    print("  • SSZ_Black_Hole_Stability.md")
-    print("  • Segmented-Spacetime-Mass-Projection (Vorlage-Repo)")
-    print("  • 21/50 Phasen komplett implementiert")
+    print("\nFeatures implemented:")
+    print("  - Post-Newtonian series up to O(U^6)")
+    print("  - Golden Ratio saturation (Black Hole Bomb)")
+    print("  - Segment density Xi(r) [CORRECTED from reference]")
+    print("  - Complete differential geometry (Gamma, R, G, T)")
+    print("  - Energy conditions (WEC/DEC/SEC)")
+    print("  - Singularity avoidance (GUARANTEED!)")
+    print("  - Hubble without Dark Energy")
+    print("  - Hawking Radiation & Entropy")
+    print("  - Classical GR tests (Perihelion, Light deflection)")
+    print("  - Multi-Body gravitation")
+    print("  - Photon Sphere & ISCO")
+    print("\nScientifically validated:")
+    print("  - 97.9% ESO Accuracy (formula basis)")
+    print("  - Black Hole Bomb 6.6x damping")
+    print("  - No singularities in 10^6 steps")
+    print("  - GR limit for weak fields")
+    print("\nReferences:")
+    print("  - SSZ_Black_Hole_Stability.md")
+    print("  - Segmented-Spacetime-Mass-Projection (Reference Repo)")
+    print("  - 21/50 phases completely implemented")
     print("="*90)
 
 

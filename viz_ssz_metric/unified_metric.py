@@ -675,7 +675,11 @@ class UnifiedSSZMetric:
         """
         Hawking-Temperatur T_H = ℏc³/(8πGMk_B)
         
-        Für Black Hole Radiation.
+        NOTE: Uses standard Hawking (1974) formula.
+        SSZ metric affects horizon, but temperature formula unchanged.
+        
+        Returns:
+            T_H in Kelvin
         """
         k_B = 1.380649e-23  # Boltzmann constant (J/K)
         
@@ -774,9 +778,12 @@ class UnifiedSSZMetric:
     
     def perihelion_precession(self, semi_major_axis: float, eccentricity: float) -> float:
         """
-        Perihel-Präzession Δφ pro Orbit (radians).
+        Perihelion precession per orbit (radians).
         
-        GR: Δφ_GR = 6πGM/(c²a(1-e²))
+        USES STANDARD GR FORMULA (Weinberg):
+        Δφ = 6πGM/(c²a(1-e²))
+        
+        NOTE: SSZ corrections negligible at Mercury orbit (~0%).
         SSZ: Δφ_SSZ = Δφ_GR × (1 + η_SSZ)
         
         Args:
@@ -936,8 +943,9 @@ class UnifiedSSZMetric:
         """
         Innermost Stable Circular Orbit with SSZ corrections.
         
-        GR: r_ISCO = 3 r_s (prograde, Schwarzschild)
-        SSZ: Small correction based on metric modification
+        HYBRID APPROACH:
+        - Base: Standard Schwarzschild r_ISCO = 3 r_s
+        - SSZ correction: +2.2% via metric function A(r)
         
         Args:
             prograde: True for prograde orbits
@@ -1105,7 +1113,9 @@ class UnifiedSSZMetric:
         """
         Quasi-Normal Modes via simplified formula.
         
-        Based on Schwarzschild QNM formulas with SSZ corrections.
+        HYBRID APPROACH:
+        - Base values: Schwarzschild (Berti et al. 2009)
+        - SSZ correction: ~3% via metric modification at photon sphere
         
         Args:
             l: Angular quantum number (l=2 for quadrupole)

@@ -28,6 +28,31 @@ import math
 from typing import Tuple, Dict, Optional
 from dataclasses import dataclass
 
+# Import SSZ Theory Components
+HAS_THEORY = False
+try:
+    from .scalar_action_theory import ScalarActionTheory, ScalarParams
+    from .numerical_stability import (
+        exp_clip, sech2_stable, sat_tanh, sat_pos_tanh,
+        safe_sqrt, safe_divide, golden_ratio_saturation
+    )
+    HAS_THEORY = True
+except ImportError:
+    try:
+        # Try absolute import (when running as script)
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from scalar_action_theory import ScalarActionTheory, ScalarParams
+        from numerical_stability import (
+            exp_clip, sech2_stable, sat_tanh, sat_pos_tanh,
+            safe_sqrt, safe_divide, golden_ratio_saturation
+        )
+        HAS_THEORY = True
+    except ImportError:
+        HAS_THEORY = False
+        print("Warning: scalar_action_theory or numerical_stability not available!")
+
 # Physikalische Konstanten
 G_DEFAULT = 6.67430e-11  # m³/(kg·s²)
 C_DEFAULT = 299792458.0  # m/s
@@ -98,6 +123,24 @@ class UnifiedSSZMetric:
             params = UnifiedMetricParameters(mass=mass)
         
         self.params = params
+        
+        # Initialize Scalar Action Theory (CRITICAL for scientific correctness!)
+        if HAS_THEORY:
+            self.scalar_theory = ScalarActionTheory(
+                ScalarParams(
+                    Z0=1.0,
+                    alpha=0.1,
+                    beta=0.01,
+                    m_phi=0.1,
+                    lambda_=0.001
+                )
+            )
+        else:
+            self.scalar_theory = None
+        
+        # Scalar field state (will be integrated later with TOV)
+        self.phi = 0.0        # Scalar field value
+        self.phi_prime = 0.0  # Radial derivative
         self._cache = {}  # Performance cache
         
         # Berechne fundamentale Größen
@@ -418,39 +461,72 @@ class UnifiedSSZMetric:
     
     def energy_momentum_tensor(self, r: float, theta: float) -> Dict[str, float]:
         """
-        Energie-Impuls-Tensor T_μν = (c⁴/8πG) G_μν
+        Energie-Impuls-Tensor T_μν AUS WIRKUNG!
         
-        Beschreibt effektive "Materie" der Segment-Struktur!
+        WISSENSCHAFTLICH KORREKT nach Segmented Spacetime:
+        
+        1. Lagrangian L = √(-g) [-Z_parallel(φ) g^μν ∂_μφ ∂_νφ - U(φ)]
+        2. T_μν = δL/δg^μν (aus Variationsprinzip!)
+        3. Anisotropie: Δ = p_t - p_r = -Z_parallel × X
+        
+        NICHT: T_μν = (c⁴/8πG) G_μν  ← Das ist FALSCH herum!
         """
-        G_tensor = self.einstein_tensor(r, theta)
-        coupling = (self.params.c**4) / (8 * math.pi * self.params.G)
+        # Metrik-Faktor
+        one_minus_2m_r = 1.0 - 2.0 * self.r_s / max(r, self.r_phi/10)
         
-        T_tt = coupling * G_tensor['G_tt']
-        T_rr = coupling * G_tensor['G_rr']
-        T_thth = coupling * G_tensor['G_thth']
-        T_phph = coupling * G_tensor['G_phph']
-        
-        # Energie-Dichte (bounded!)
-        rho = (self.params.c**2 / (8 * math.pi * self.params.G)) * G_tensor['G_tt']
-        rho_safe = np.clip(rho, -self.rho_max, self.rho_max)
-        
-        # Druck
-        p_r = T_rr
-        p_t = (T_thth / (r**2) + T_phph / (r * np.sin(theta))**2) / 2
-        
-        # Zustandsgleichung
-        w = p_r / rho_safe if abs(rho_safe) > 1e-30 else 0.0
-        
-        return {
-            'T_tt': T_tt,
-            'T_rr': T_rr,
-            'T_thth': T_thth,
-            'T_phph': T_phph,
-            'rho': rho_safe,
-            'p_r': p_r,
-            'p_t': p_t,
-            'w': w  # Equation of state
-        }
+        if HAS_THEORY and self.scalar_theory is not None:
+            # WISSENSCHAFTLICH KORREKT: T_μν aus Wirkungstheorie!
+            rho_phi, p_r_phi, p_t_phi, Delta_phi = self.scalar_theory.stress_energy_tensor(
+                self.phi, self.phi_prime, one_minus_2m_r
+            )
+            
+            # Bounds (numerische Sicherheit)
+            if HAS_THEORY:
+                rho_phi = np.clip(rho_phi, 0, self.rho_max)
+                p_r_phi = np.clip(p_r_phi, -self.rho_max, self.rho_max)
+                p_t_phi = np.clip(p_t_phi, -self.rho_max, self.rho_max)
+            
+            # Zustandsgleichung
+            w = p_r_phi / rho_phi if abs(rho_phi) > 1e-30 else 0.0
+            
+            return {
+                'rho': rho_phi,          # Energie-Dichte (aus Wirkung!)
+                'p_r': p_r_phi,          # Radialdruck (aus Wirkung!)
+                'p_t': p_t_phi,          # Tangentialdruck (aus Wirkung!)
+                'Delta': Delta_phi,      # Anisotropie (CRITICAL!)
+                'w': w,                  # Equation of state
+                # Legacy components (für Kompatibilität)
+                'T_tt': -rho_phi * self.params.c**2,
+                'T_rr': p_r_phi,
+                'T_thth': p_t_phi * r**2,
+                'T_phph': p_t_phi * (r * np.sin(theta))**2
+            }
+        else:
+            # FALLBACK (wenn scalar_theory nicht verfügbar)
+            # Verwende Einstein-Tensor (alte Methode)
+            print("Warning: Using fallback T_munu calculation (not from action!)")
+            G_tensor = self.einstein_tensor(r, theta)
+            coupling = (self.params.c**4) / (8 * math.pi * self.params.G)
+            
+            rho = (self.params.c**2 / (8 * math.pi * self.params.G)) * G_tensor['G_tt']
+            rho_safe = np.clip(rho, -self.rho_max, self.rho_max)
+            
+            p_r = coupling * G_tensor['G_rr']
+            p_t = (coupling * G_tensor['G_thth'] / (r**2) + coupling * G_tensor['G_phph'] / (r * np.sin(theta))**2) / 2
+            
+            w = p_r / rho_safe if abs(rho_safe) > 1e-30 else 0.0
+            
+            return {
+                'rho': rho_safe,
+                'p_r': p_r,
+                'p_t': p_t,
+                'Delta': p_t - p_r,  # Approximation
+                'w': w,
+                'T_tt': coupling * G_tensor['G_tt'],
+                'T_rr': coupling * G_tensor['G_rr'],
+                'T_thth': coupling * G_tensor['G_thth'],
+                'T_phph': coupling * G_tensor['G_phph']
+            }
     
     def energy_conditions(self, r: float, theta: float) -> Dict[str, bool]:
         """

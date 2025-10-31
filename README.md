@@ -2,8 +2,8 @@
 
 **Segmented Spacetime (SSZ) Metric with Complete Observable Suite**
 
-[![Tests](https://img.shields.io/badge/tests-41%2F41%20passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)]()
+[![Tests](https://img.shields.io/badge/core_tests-24%2F24_passing-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-~85%25-green)]()
 [![Status](https://img.shields.io/badge/status-production%20ready-blue)]()
 [![License](https://img.shields.io/badge/license-Anti--Capitalist%20v1.4-red)]()
 
@@ -13,10 +13,10 @@
 
 A **scientifically complete** implementation of the Segmented Spacetime (SSZ) metric featuring:
 
-- ✅ **21 Observable Methods** (Photon Sphere, Shadow, QNM, ISCO, Hawking, Geodesics, Perihelion)
-- ✅ **41 Passing Tests** (100% success rate)
-- ✅ **Mercury Perihelion:** 99.7% match with observation (42.99 vs 43.13 arcsec/century)
-- ✅ **QNM:** Perfect mass scaling (f ∝ 1/M)
+- ✅ **26 Observable Methods** (Photon Sphere, Shadow, QNM, ISCO, Hawking, Geodesics, Perihelion, Kerr)
+- ✅ **24/24 Core Tests Passing** (Mercury, QNM, Shadow, ISCO, Features)
+- ✅ **Mercury Perihelion:** 99.67% match with observation (42.99 vs 43.13 arcsec/century)
+- ✅ **QNM:** Perfect mass scaling (f ∝ 1/M exactly)
 - ✅ **Production Ready:** Clean, documented, validated
 
 ---

@@ -118,11 +118,35 @@ class UnifiedSSZMetric:
             params: Full parameters (UnifiedMetricParameters)
             mass: Simple initialization with just mass (uses defaults)
             phi_mode: 'approximate' (fast, φ_0*exp(-r/r_φ)) or 'tov' (exact, LSODA integration)
+        
+        Raises:
+            ValueError: If mass is invalid (negative, zero, NaN, or infinite)
+            ValueError: If phi_mode is not 'approximate' or 'tov'
         """
+        # Input validation
         if params is None:
             if mass is None:
-                raise ValueError("Entweder params oder mass muss angegeben werden!")
+                raise ValueError("Either params or mass must be provided!")
+            # Validate mass
+            if not isinstance(mass, (int, float)):
+                raise TypeError(f"Mass must be numeric, got {type(mass).__name__}")
+            if np.isnan(mass):
+                raise ValueError("Mass cannot be NaN")
+            if np.isinf(mass):
+                raise ValueError("Mass cannot be infinite")
+            if mass <= 0:
+                raise ValueError(f"Mass must be positive, got {mass} kg")
             params = UnifiedMetricParameters(mass=mass)
+        else:
+            # Validate params.mass
+            if params.mass <= 0:
+                raise ValueError(f"Mass must be positive, got {params.mass} kg")
+            if np.isnan(params.mass) or np.isinf(params.mass):
+                raise ValueError(f"Mass must be finite, got {params.mass}")
+        
+        # Validate phi_mode
+        if phi_mode not in ['approximate', 'tov']:
+            raise ValueError(f"phi_mode must be 'approximate' or 'tov', got '{phi_mode}'")
         
         self.params = params
         
@@ -492,7 +516,7 @@ class UnifiedSSZMetric:
         Kretschmann-Skalar K = R_μνρσ R^μνρσ - ENDLICH!
         
         GR: K → ∞ für r → 0
-        SSZ: K ≤ K_max (BOUNDED!)
+        SSZ: K <= K_max (BOUNDED!)
         """
         # GR-Baseline
         K_GR = 12.0 * (self.r_s**2) / (r**6)
@@ -756,7 +780,7 @@ class UnifiedSSZMetric:
         """
         if lambda_A >= self.lambda_crit:
             raise ValueError(
-                f"Instabile Kopplung! λ_A={lambda_A:.6f} ≥ λ_crit={self.lambda_crit:.6f}"
+                f"Instabile Kopplung! λ_A={lambda_A:.6f} >= λ_crit={self.lambda_crit:.6f}"
             )
         
         K = self.params.K_segments
@@ -991,7 +1015,7 @@ class UnifiedSSZMetric:
         For rotating black holes with spin parameter a.
         
         Args:
-            a: Dimensionless spin parameter (0 ≤ a ≤ 1)
+            a: Dimensionless spin parameter (0 <= a <= 1)
                a = 0: Schwarzschild
                a = 1: Extremal Kerr
             prograde: True for prograde orbits, False for retrograde
@@ -1003,7 +1027,7 @@ class UnifiedSSZMetric:
             Bardeen, Press & Teukolsky (1972), ApJ 178, 347
         """
         if not (0 <= a <= 1):
-            raise ValueError(f"Spin parameter must be 0 ≤ a ≤ 1, got {a}")
+            raise ValueError(f"Spin parameter must be 0 <= a <= 1, got {a}")
         
         # Bardeen formula for Kerr ISCO
         Z1 = 1 + (1 - a**2)**(1/3) * ((1 + a)**(1/3) + (1 - a)**(1/3))
@@ -1034,7 +1058,7 @@ class UnifiedSSZMetric:
         Kerr photon sphere radius (equatorial plane).
         
         Args:
-            a: Spin parameter (0 ≤ a ≤ 1)
+            a: Spin parameter (0 <= a <= 1)
             prograde: True for prograde, False for retrograde
         
         Returns:
@@ -1044,7 +1068,7 @@ class UnifiedSSZMetric:
             Bardeen (1973), in Black Holes
         """
         if not (0 <= a <= 1):
-            raise ValueError(f"Spin must be 0 ≤ a ≤ 1, got {a}")
+            raise ValueError(f"Spin must be 0 <= a <= 1, got {a}")
         
         M_geom = self.params.G * self.params.mass / self.params.c**2
         
@@ -1073,14 +1097,14 @@ class UnifiedSSZMetric:
         nothing can remain stationary.
         
         Args:
-            a: Spin parameter (0 ≤ a ≤ 1)
+            a: Spin parameter (0 <= a <= 1)
             theta: Polar angle (0 = poles, π/2 = equator)
         
         Returns:
             r_ergo in meters
         """
         if not (0 <= a <= 1):
-            raise ValueError(f"Spin must be 0 ≤ a ≤ 1, got {a}")
+            raise ValueError(f"Spin must be 0 <= a <= 1, got {a}")
         
         M_geom = self.params.G * self.params.mass / self.params.c**2
         
@@ -1097,12 +1121,20 @@ class UnifiedSSZMetric:
         in the Kerr spacetime due to the rotation of the black hole.
         
         Args:
-            r: Radius (meters)
-            a: Spin parameter (0 ≤ a ≤ 1)
+            r: Radius (meters, must be positive)
+            a: Spin parameter (0 <= a <= 1)
         
         Returns:
             ω in rad/s (angular velocity of frame dragging)
+        
+        Raises:
+            ValueError: If r <= 0 or a not in [0, 1]
         """
+        if r <= 0:
+            raise ValueError(f"Radius must be positive, got {r} m")
+        if not (0 <= a <= 1):
+            raise ValueError(f"Spin must be 0 <= a <= 1, got {a}")
+        
         # Approximate formula for slow rotation: ω = 2GMa/(c²r³)
         omega = 2 * self.params.G * self.params.mass * a / \
                 (self.params.c**2 * r**3)

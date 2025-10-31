@@ -815,7 +815,7 @@ def demo():
     
     # Black Hole Bomb Test
     print("\n[BLACK HOLE BOMB TEST]")
-    lambda_A = 0.005  # < lambda_crit
+    lambda_A = 0.00005  # < lambda_crit = 0.0001
     E_evolution = metric.energy_evolution_black_hole_bomb(1.0, lambda_A, time_steps=10000)
     print(f"  lambda_A = {lambda_A} (lambda_crit = {metric.lambda_crit:.6e})")
     print(f"  E(t=0) = {E_evolution[0]:.6f}")

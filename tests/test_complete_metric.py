@@ -48,7 +48,6 @@ def test_all_features_present():
     assert len(missing) == 0, f"Missing: {missing}"
     
     print(f"[OK] All {len(all_features)} features present")
-    return len(all_features)
 
 
 def test_hawking_radiation():

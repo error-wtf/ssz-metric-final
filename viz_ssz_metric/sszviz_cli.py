@@ -180,6 +180,137 @@ def gif_curvature_proxy(rs: float, varphi=PHI, outname="curvature_proxy_scan.gif
     _save_gif(frames, os.path.join(OUTDIR, outname), duration=120)
 
 
+def gif_lens(rs: float, varphi=PHI, outname="lensing_paths.gif"):
+    """
+    Animate light rays (null geodesics) through the SSZ metric.
+    Shows gravitational lensing with different impact parameters.
+    """
+    from .geodesics import GeodesicIntegrator
+    from .unified_metric import UnifiedSSZMetric
+    
+    # Create metric (use standard mass for visualization)
+    M_test = 2e30  # ~1 solar mass
+    metric = UnifiedSSZMetric(mass=M_test)
+    metric.r_s = rs  # Override for visualization
+    integrator = GeodesicIntegrator(metric)
+    
+    # Different impact parameters
+    b_values = np.linspace(1.5*rs, 5*rs, 8)
+    
+    frames = []
+    
+    # Animate by highlighting different rays
+    for b_highlight in b_values:
+        fig, ax = plt.subplots(figsize=(6, 6), dpi=120, subplot_kw=dict(projection='polar'))
+        
+        for b in b_values:
+            # Initial conditions for photon at r0 = 50rs
+            r0 = 50 * rs
+            # Approximation: photon with impact parameter b
+            # v_phi ≈ b / r0
+            v_phi = b / r0
+            
+            # Simplified null geodesic (just for visualization)
+            # In reality would integrate full geodesic equations
+            phi_vals = np.linspace(0, np.pi, 200)
+            r_vals = b / np.sin(phi_vals + 1e-3)  # Simplified trajectory
+            r_vals = np.clip(r_vals, 1.01*rs, 100*rs)
+            
+            # Plot styling
+            alpha = 1.0 if abs(b - b_highlight) < 0.1*rs else 0.3
+            lw = 2.5 if abs(b - b_highlight) < 0.1*rs else 1.0
+            color = 'red' if abs(b - b_highlight) < 0.1*rs else 'blue'
+            
+            ax.plot(phi_vals, r_vals/rs, alpha=alpha, lw=lw, color=color)
+        
+        # Add horizon circle
+        circle_phi = np.linspace(0, 2*np.pi, 100)
+        circle_r = np.ones_like(circle_phi)
+        ax.plot(circle_phi, circle_r, 'k--', lw=2, label='Horizon')
+        
+        ax.set(ylim=(0, 10), 
+               title=f"Gravitational Lensing — b = {b_highlight/rs:.2f} $r_s$")
+        ax.grid(alpha=0.3)
+        
+        buf = io.BytesIO()
+        plt.tight_layout()
+        fig.savefig(buf, format="png")
+        plt.close(fig)
+        buf.seek(0)
+        frames.append(Image.open(buf).convert("P"))
+    
+    _save_gif(frames, os.path.join(OUTDIR, outname), duration=150)
+
+
+def gif_wave(rs: float, varphi=PHI, outname="wave_packet.gif"):
+    """
+    Animate 1D wave packet propagation with c(x) = sqrt(A(r)).
+    Shows wave propagation speed varying with spacetime curvature.
+    """
+    # Spatial grid
+    x_min, x_max = 1.05*rs, 20*rs
+    N_points = 500
+    x = np.linspace(x_min, x_max, N_points)
+    dx = x[1] - x[0]
+    
+    # Get A(x) for wave speed
+    Asafe, rstar = A_safe(x, rs, varphi=varphi)
+    c_local = np.sqrt(np.maximum(Asafe, 0.01))  # Local speed of light
+    
+    # Initial Gaussian wave packet
+    x0 = 10 * rs
+    sigma = 2 * rs
+    k0 = 2 * np.pi / rs  # Wave number
+    
+    # Complex wave function
+    psi_init = np.exp(-((x - x0)**2) / (2*sigma**2)) * np.exp(1j * k0 * x)
+    
+    frames = []
+    
+    # Time evolution (simplified advection)
+    dt = 0.5
+    t_max = 30
+    
+    psi = psi_init.copy()
+    
+    for t in np.arange(0, t_max, dt):
+        # Simple advection: ∂ψ/∂t = -c(x) ∂ψ/∂x
+        # Using upwind scheme
+        psi_new = psi.copy()
+        for i in range(1, N_points-1):
+            dpsi_dx = (psi[i+1] - psi[i-1]) / (2*dx)
+            psi_new[i] = psi[i] - dt * c_local[i] * dpsi_dx
+        
+        psi = psi_new
+        
+        # Every few steps, save a frame
+        if int(t/dt) % 2 == 0:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), dpi=120, sharex=True)
+            
+            # Top: Wave packet amplitude
+            ax1.plot(x/rs, np.abs(psi)**2, lw=2, color='blue')
+            ax1.axvline(rstar/rs, ls=':', color='red', alpha=0.6, label='$r^*$')
+            ax1.set(ylabel='$|\\psi|^2$', ylim=(0, 1.1),
+                    title=f"Wave Packet — t = {t:.1f}")
+            ax1.grid(alpha=0.3)
+            ax1.legend()
+            
+            # Bottom: Local speed of light
+            ax2.plot(x/rs, c_local, lw=2, color='green')
+            ax2.axvline(rstar/rs, ls=':', color='red', alpha=0.6)
+            ax2.set(xlabel='r/$r_s$', ylabel='$c_{local}/c$', ylim=(0, 1.1))
+            ax2.grid(alpha=0.3)
+            
+            buf = io.BytesIO()
+            plt.tight_layout()
+            fig.savefig(buf, format="png")
+            plt.close(fig)
+            buf.seek(0)
+            frames.append(Image.open(buf).convert("P"))
+    
+    _save_gif(frames, os.path.join(OUTDIR, outname), duration=100)
+
+
 def main():
     """CLI entry point."""
     ap = argparse.ArgumentParser(
@@ -207,7 +338,7 @@ Examples:
     # GIF command
     pgif = sub.add_parser("gif", help="Generate animated GIFs")
     pgif.add_argument("--kind", 
-                      choices=["time", "A", "K", "all"], 
+                      choices=["time", "A", "K", "lens", "wave", "all"], 
                       default="all",
                       help="Which GIF(s) to generate")
     pgif.add_argument("--varphi", type=float, default=PHI,
@@ -232,6 +363,14 @@ Examples:
         if args.kind in ("K", "all"):
             print("📊 Creating curvature proxy animation...")
             gif_curvature_proxy(args.rs, args.varphi)
+        
+        if args.kind in ("lens", "all"):
+            print("📊 Creating gravitational lensing animation...")
+            gif_lens(args.rs, args.varphi)
+        
+        if args.kind in ("wave", "all"):
+            print("📊 Creating wave packet animation...")
+            gif_wave(args.rs, args.varphi)
         
         print(f"\n✅ Done! Check: {OUTDIR}/\n")
 

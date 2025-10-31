@@ -1,0 +1,18 @@
+# Core dependencies (exact versions for reproducibility)
+numpy==1.24.3
+scipy==1.10.1
+mpmath==1.3.0
+sympy==1.12
+matplotlib==3.7.1
+Pillow==9.5.0
+
+# Test dependencies
+pytest==7.3.1
+pytest-cov==4.0.0
+
+# Development dependencies (optional)
+# black==23.3.0
+# flake8==6.0.0
+# mypy==1.3.0
+# ipython==8.12.0
+# jupyter==1.0.0

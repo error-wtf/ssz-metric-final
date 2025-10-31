@@ -26,11 +26,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r viz_ssz_metric/requirements.txt
+          pip install -e .[test]
       
-      - name: Run tests
+      - name: Run all tests
         run: |
-          pytest -q viz_ssz_metric/tests/
+          pytest -q tests/ viz_ssz_metric/tests/
       
       - name: Check intersection values (φ=1.0 and φ=φ)
         run: |
